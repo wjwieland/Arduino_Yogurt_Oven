@@ -1,7 +1,6 @@
 #include <Time.h>
 //#define TIME_HEADER  "T"   // Header tag for serial time sync message
 #define TIME_REQUEST  7    // ASCII bell character requests a time sync message 
-//#define HOW_LONG_HEADER "S"
 
 #include <OneWire.h>
 #include <DallasTemperature.h>
@@ -13,16 +12,16 @@ OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 DeviceAddress insideThermometer = { 0x28, 0xC1, 0xD1, 0xDC, 0x06, 0x00, 0x00, 0xE7 };
 //######################################################################################
-unsigned long start_millis;
+unsigned long start_millis;   //Keeps track of when the ferment cycle starts
 time_t diff;
 time_t last;
 time_t start_time;
 time_t acc_time;
 time_t DEFAULT_TIME = 1357041600;
 float cook_timer;
-float time_left = 3600000;
-float tmp;
-boolean synced = false;
+float time_left = 3600000;  //default set to 1 hour
+float tmp;                  //storage for current temperature reading
+boolean synced = false;     //The booleans all keep track of status
 boolean heat_off = true;
 boolean isTimer = false;
 boolean isSync = false;
@@ -45,21 +44,24 @@ void setup()
 //#######################################################################################
  
 void loop() {
-  unsigned long int cycle_start = millis();
+  unsigned long int cycle_start = millis();     //Track the cycle time of the Arduino
   if (Serial.available()> 1) {
     processHeader();
     processSyncMessage();
   }
+  //All the following must be in the state checked for in the 'if' or nothing is done
   if ( (timeStatus() == timeSet) && (heat_off == false) && (timer_set == true) ) {
     digitalWrite(13, HIGH); // LED on if synced
     diff = second() - last;
-    if (diff >= 3) {
+    if (diff >= 3) {    //Check only every 3 seconds, more is not required and hard to read on the serial monitor
       last = second();
       sensors.requestTemperatures();
       Serial.println("***************");
       Serial.println();
       Serial.println("Temperature is: ");
       tmp = printTemperature(insideThermometer);
+ 
+      //This is where we turn on and off the heat source based on the temp reading
       if (tmp < 98.40)  {
         digitalWrite(8, 1);
       }
@@ -69,16 +71,16 @@ void loop() {
       if (timeStatus()!= timeNotSet) {
         digitalClockDisplay();  
       }
-      if (time_left < 1 ) {
+      if (time_left < 1 ) {     //If we are done fermenting, shut off the heat source
         Serial.println("Cook Complete, Yogurt Ready!");
         heat_off = true;
       }
-      unsigned long int cycle_end = millis();
+      unsigned long int cycle_end = millis();   //get the cycle time and report it
       unsigned long int cycle_length = cycle_end - cycle_start;
       Serial.print("Cycle length in milliseconds is ");
       Serial.println(cycle_length);
     }
-  } else {
+  } else {      //if everything is not set or right, we make sure heat is off!
     digitalWrite(13, LOW);  // LED off if needs refresh
     heat_off = true;
   }
@@ -114,7 +116,7 @@ void processHeader() {
       isTimer = false;
       Serial.println(F("Seting Clock"));
    }
-   else if (c == 'S') {
+   else if (c == 'S') {   //Added this so that the ferment time can be set
       isTimer = true;
       isSync = false;   
       Serial.println(F("Setting Cook Timer"));
