@@ -39,6 +39,8 @@ void setup()
   pinMode(8, OUTPUT);
   setSyncProvider( requestSync);  //set function to call when sync required
   Serial.println("Waiting for sync message");
+  Serial.println("Enter length of ferment time first.  ex. \'S4.5\' for four and and a half hours");
+  Serial.println("Subsequently, set the clock by using \'Date +T%s\' ");
 }
 //#######################################################################################
  
