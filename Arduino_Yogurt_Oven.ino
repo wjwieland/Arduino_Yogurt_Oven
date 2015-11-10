@@ -1,6 +1,7 @@
 #include <Time.h>
 //#define TIME_HEADER  "T"   // Header tag for serial time sync message
 #define TIME_REQUEST  7    // ASCII bell character requests a time sync message 
+//#define HOW_LONG_HEADER "S"
 
 #include <OneWire.h>
 #include <DallasTemperature.h>
@@ -12,16 +13,18 @@ OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 DeviceAddress insideThermometer = { 0x28, 0xC1, 0xD1, 0xDC, 0x06, 0x00, 0x00, 0xE7 };
 //######################################################################################
-unsigned long start_millis;   //Keeps track of when the ferment cycle starts
+unsigned long start_millis;
+unsigned long accum_millis;
+unsigned long cycle_length;
 time_t diff;
 time_t last;
 time_t start_time;
 time_t acc_time;
 time_t DEFAULT_TIME = 1357041600;
 float cook_timer;
-float time_left = 3600000;  //default set to 1 hour
-float tmp;                  //storage for current temperature reading
-boolean synced = false;     //The booleans all keep track of status
+float time_left = 3600000;
+float tmp;
+boolean synced = false;
 boolean heat_off = true;
 boolean isTimer = false;
 boolean isSync = false;
@@ -36,7 +39,7 @@ void setup()
   Serial.println();
   // Start up the library
   pinMode(8, OUTPUT);
-  setSyncProvider( requestSync);  //set function to call when sync required
+  //setSyncProvider( requestSync);  //set function to call when sync required
   Serial.println("Waiting for sync message");
   Serial.println("Enter length of ferment time first.  ex. \'S4.5\' for four and and a half hours");
   Serial.println("Subsequently, set the clock by using \'Date +T%s\' ");
@@ -44,46 +47,46 @@ void setup()
 //#######################################################################################
  
 void loop() {
-  unsigned long int cycle_start = millis();     //Track the cycle time of the Arduino
-  if (Serial.available()> 1) {
+  unsigned long int cycle_start = millis();
+  if ( (Serial.available() > 1) ) {
     processHeader();
-    processSyncMessage();
   }
-  //All the following must be in the state checked for in the 'if' or nothing is done
-  if ( (timeStatus() == timeSet) && (heat_off == false) && (timer_set == true) ) {
-    digitalWrite(13, HIGH); // LED on if synced
-    diff = second() - last;
-    if (diff >= 3) {    //Check only every 3 seconds, more is not required and hard to read on the serial monitor
-      last = second();
-      sensors.requestTemperatures();
-      Serial.println("***************");
-      Serial.println();
-      Serial.println("Temperature is: ");
-      tmp = printTemperature(insideThermometer);
+  diff = second() - last;
+  if ( (diff >= 3) & ( ( timer_set == false) | (synced == false) ) ) {
+    sensors.requestTemperatures();
+    Serial.println("***************");
+    Serial.println();
+    Serial.println("Temperature is: ");
+    tmp = printTemperature(insideThermometer);
+    last = second();
+    Serial.println(diff);
+  }
+
+ // printTemperature(insideThermometer);
  
-      //This is where we turn on and off the heat source based on the temp reading
-      if (tmp < 98.40)  {
+  if (diff >= 3)  {
+       digitalWrite(13, HIGH); // LED on if synced
+       if (tmp < 114.60)  {
         digitalWrite(8, 1);
       }
-      if (tmp > 98.60) {
+      if (tmp >= 115.00) {
         digitalWrite(8, 0);
       }
-      if (timeStatus()!= timeNotSet) {
-        digitalClockDisplay();  
-      }
-      if (time_left < 1 ) {     //If we are done fermenting, shut off the heat source
+      if (time_left < 1 ) {
         Serial.println("Cook Complete, Yogurt Ready!");
         heat_off = true;
       }
-      unsigned long int cycle_end = millis();   //get the cycle time and report it
-      unsigned long int cycle_length = cycle_end - cycle_start;
-      Serial.print("Cycle length in milliseconds is ");
-      Serial.println(cycle_length);
-    }
-  } else {      //if everything is not set or right, we make sure heat is off!
+    unsigned long int cycle_end = millis();
+    cycle_length = cycle_start - cycle_end;
+    last = second();
+    Serial.print("Cycle lenth is ");
+    Serial.println(cycle_length);
+    printTemperature(insideThermometer);
+    digitalClockDisplay();
+    } else {
     digitalWrite(13, LOW);  // LED off if needs refresh
     heat_off = true;
-  }
+    }
 }
 
 //################################################################
@@ -106,7 +109,7 @@ void printDigits(int digits){
   Serial.print(":");
   if(digits < 10)
     Serial.print('0');
-  Serial.print(digits);
+    Serial.print(digits);
 }
 
 void processHeader() {
@@ -114,45 +117,36 @@ void processHeader() {
    if(c == 'T') {
       isSync = true;
       isTimer = false;
-      Serial.println(F("Seting Clock"));
    }
-   else if (c == 'S') {   //Added this so that the ferment time can be set
+   else if (c == 'S') {
       isTimer = true;
-      isSync = false;   
-      Serial.println(F("Setting Cook Timer"));
+      isSync = false;
    }  
+   processSyncMessage(); 
 }
 
 void processSyncMessage() {
   unsigned long pctime;
-  const unsigned long DEFAULT_TIME = 1357041600; // Jan 1 2013
-
-//  if(Serial.find(TIME_HEADER)) {
     if(isSync == true) {
      pctime = Serial.parseInt();
-     if( pctime >= DEFAULT_TIME) { // check the integer is a valid time (greater than Jan 1 2013)
-       setTime(pctime); // Sync Arduino clock to the time received on the serial port
-       adjustTime(-18000);  // compensate for local offset
-       synced = true;
-       heat_off = false;
-     } else {
-      setTime(DEFAULT_TIME);
-      synced = false;
-      heat_off = true;
-     }
+     setTime(pctime); // Sync Arduino clock to the time received on the serial port
+     adjustTime(-18000);  // compensate for local offset
+     synced = true;
+     heat_off = false;
+     isSync = false;
+     Serial.println("Clock Set");
      start_time = now();
-     start_millis = millis();
   }
   if(isTimer == true) {
     float length_cook = Serial.parseFloat(); 
     Serial.println("Timer set....");
     cook_timer = (3600000.0 * length_cook) + millis();
     timer_set = true;
+    isTimer == false;
   }
 }
 
-time_t requestSync()
-{
+time_t requestSync() {
   Serial.write(TIME_REQUEST);  
   return 0; // the time will be sent later in response to serial mesg
 }
@@ -172,22 +166,24 @@ void digitalClockDisplay(){
   Serial.println();
 
  Serial.print("Time Left ");
-  time_left = (cook_timer - millis()) / 60000.0;
+  if (synced == true) {
+    time_left = (cook_timer - millis()) / 60000.0;
+  }
   Serial.print(time_left);
-//  printDigits(minute(time_left));
-//  printDigits(second(time_left));
+  printDigits(minute(time_left));
+  printDigits(second(time_left));
   Serial.println();
   
   Serial.print("Current Time Is ");
   Serial.print(hour());
   printDigits(minute());
   printDigits(second());
-  /*Serial.print(" ");
+  Serial.print(" ");
   Serial.print(day());
   Serial.print(" ");
   Serial.print(month());
   Serial.print(" ");
-  Serial.print(year()); */
+  Serial.print(year()); 
   Serial.println(); 
   Serial.println(); 
 }
