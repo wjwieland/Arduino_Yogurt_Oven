@@ -64,8 +64,9 @@ void loop() {
 
  // printTemperature(insideThermometer);
  
-  if (diff >= 3)  {
+  if ( (diff >= 3) && (synced == true) && (timer_set == true) ) {
        digitalWrite(13, HIGH); // LED on if synced
+       tmp = printTemperature(insideThermometer);
        if (tmp < 114.60)  {
         digitalWrite(8, 1);
       }
@@ -77,9 +78,9 @@ void loop() {
         heat_off = true;
       }
     unsigned long int cycle_end = millis();
-    cycle_length = cycle_start - cycle_end;
+    cycle_length = cycle_end- cycle_start;
     last = second();
-    Serial.print("Cycle lenth is ");
+    Serial.print("Cycle length is ");
     Serial.println(cycle_length);
     printTemperature(insideThermometer);
     digitalClockDisplay();
@@ -179,11 +180,11 @@ void digitalClockDisplay(){
   printDigits(minute());
   printDigits(second());
   Serial.print(" ");
-  Serial.print(day());
-  Serial.print(" ");
-  Serial.print(month());
-  Serial.print(" ");
-  Serial.print(year()); 
+ // Serial.print(day());
+//  Serial.print(" ");
+//  Serial.print(month());
+//  Serial.print(" ");
+//  Serial.print(year()); 
   Serial.println(); 
   Serial.println(); 
 }
