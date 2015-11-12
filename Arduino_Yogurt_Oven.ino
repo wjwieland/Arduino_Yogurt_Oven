@@ -1,10 +1,11 @@
+#include <DallasTemperature.h>
+#include <OneWire.h>
+
 #include <Time.h>
 //#define TIME_HEADER  "T"   // Header tag for serial time sync message
 #define TIME_REQUEST  7    // ASCII bell character requests a time sync message 
 //#define HOW_LONG_HEADER "S"
 
-#include <OneWire.h>
-#include <DallasTemperature.h>
 // Data wire is plugged into pin 7 on the Arduino
 #define ONE_WIRE_BUS 7
 // Setup a oneWire instance to communicate with any OneWire devices
@@ -52,42 +53,49 @@ void loop() {
     processHeader();
   }
   diff = second() - last;
-  if ( (diff >= 3) & ( ( timer_set == false) | (synced == false) ) ) {
+  if ( (diff >= 3) && ( ( timer_set == false) || (synced == false) ) ) {
     sensors.requestTemperatures();
     Serial.println("***************");
     Serial.println();
     Serial.println("Temperature is: ");
-    tmp = printTemperature(insideThermometer);
+    digitalClockDisplay();
     last = second();
-    Serial.println(diff);
   }
 
  // printTemperature(insideThermometer);
  
   if ( (diff >= 3) && (synced == true) && (timer_set == true) ) {
-       digitalWrite(13, HIGH); // LED on if synced
-       tmp = printTemperature(insideThermometer);
-       if (tmp < 114.60)  {
+     digitalWrite(13, HIGH); // LED on if synced
+     sensors.requestTemperatures();
+     float tempC = sensors.getTempC(insideThermometer);
+     tmp = DallasTemperature::toFahrenheit(tempC);
+     Serial.print("Temp is ");
+     Serial.println(tmp);
+     if (tmp < 114.60)  {
         digitalWrite(8, 1);
-      }
-      if (tmp >= 115.00) {
+     }
+     if (tmp >= 115.00) {
         digitalWrite(8, 0);
-      }
-      if (time_left < 1 ) {
-        Serial.println("Cook Complete, Yogurt Ready!");
-        heat_off = true;
-      }
+     }
+    if (time_left < 1 ) {
+      Serial.println("Cook Complete, Yogurt Ready!");
+      heat_off = true;
+      timer_set = false;
+      synced = false;
+      acc_time = 0;
+    }
     unsigned long int cycle_end = millis();
     cycle_length = cycle_end- cycle_start;
     last = second();
     Serial.print("Cycle length is ");
     Serial.println(cycle_length);
-    printTemperature(insideThermometer);
+//    printTemperature(insideThermometer);
     digitalClockDisplay();
     } else {
-    digitalWrite(13, LOW);  // LED off if needs refresh
-    heat_off = true;
+      digitalWrite(13, LOW);  // LED off if needs refresh
+      heat_off = true;
     }
+  //last = second();
 }
 
 //################################################################
@@ -142,6 +150,7 @@ void processSyncMessage() {
     float length_cook = Serial.parseFloat(); 
     Serial.println("Timer set....");
     cook_timer = (3600000.0 * length_cook) + millis();
+    time_left = (cook_timer - millis()) / 60000.0;
     timer_set = true;
     isTimer == false;
   }
