@@ -1,10 +1,8 @@
 #include <DallasTemperature.h>
 #include <OneWire.h>
-
 #include <Time.h>
-//#define TIME_HEADER  "T"   // Header tag for serial time sync message
+
 #define TIME_REQUEST  7    // ASCII bell character requests a time sync message 
-//#define HOW_LONG_HEADER "S"
 
 // Data wire is plugged into pin 7 on the Arduino
 #define ONE_WIRE_BUS 7
@@ -38,9 +36,7 @@ void setup()
                        //to view the result open the serial monitor 
   Serial.print("Program = yogurt_one_wire");
   Serial.println();
-  // Start up the library
   pinMode(8, OUTPUT);
-  //setSyncProvider( requestSync);  //set function to call when sync required
   Serial.println("Waiting for sync message");
   Serial.println("Enter length of ferment time first.  ex. \'S4.5\' for four and and a half hours");
   Serial.println("Subsequently, set the clock by using \'Date +T%s\' ");
@@ -58,13 +54,14 @@ void loop() {
     Serial.println("***************");
     Serial.println();
     Serial.println("Temperature is: ");
+    float tempC = sensors.getTempC(insideThermometer);
+    tmp = DallasTemperature::toFahrenheit(tempC);
+    Serial.println(tmp);
     digitalClockDisplay();
     last = second();
   }
-
- // printTemperature(insideThermometer);
- 
   if ( (diff >= 3) && (synced == true) && (timer_set == true) ) {
+     heat_off = false;
      digitalWrite(13, HIGH); // LED on if synced
      sensors.requestTemperatures();
      float tempC = sensors.getTempC(insideThermometer);
@@ -79,9 +76,9 @@ void loop() {
      }
     if (time_left < 1 ) {
       Serial.println("Cook Complete, Yogurt Ready!");
+      digitalWrite(8, 0);
       heat_off = true;
       timer_set = false;
-      synced = false;
       acc_time = 0;
     }
     unsigned long int cycle_end = millis();
@@ -89,13 +86,11 @@ void loop() {
     last = second();
     Serial.print("Cycle length is ");
     Serial.println(cycle_length);
-//    printTemperature(insideThermometer);
     digitalClockDisplay();
     } else {
       digitalWrite(13, LOW);  // LED off if needs refresh
       heat_off = true;
     }
-  //last = second();
 }
 
 //################################################################
@@ -112,7 +107,7 @@ long unsigned int printTemperature(DeviceAddress deviceAddress)
   }
   return (DallasTemperature::toFahrenheit(tempC));
 }
-
+//################################################################
 void printDigits(int digits){
   // utility function for digital clock display: prints preceding colon and leading 0
   Serial.print(":");
@@ -120,7 +115,7 @@ void printDigits(int digits){
     Serial.print('0');
     Serial.print(digits);
 }
-
+//################################################################
 void processHeader() {
    char c = Serial.read();
    if(c == 'T') {
@@ -133,7 +128,7 @@ void processHeader() {
    }  
    processSyncMessage(); 
 }
-
+//################################################################
 void processSyncMessage() {
   unsigned long pctime;
     if(isSync == true) {
@@ -144,23 +139,18 @@ void processSyncMessage() {
      heat_off = false;
      isSync = false;
      Serial.println("Clock Set");
-     start_time = now();
   }
   if(isTimer == true) {
     float length_cook = Serial.parseFloat(); 
     Serial.println("Timer set....");
     cook_timer = (3600000.0 * length_cook) + millis();
     time_left = (cook_timer - millis()) / 60000.0;
+    start_time = now();
     timer_set = true;
     isTimer == false;
   }
 }
-
-time_t requestSync() {
-  Serial.write(TIME_REQUEST);  
-  return 0; // the time will be sent later in response to serial mesg
-}
-
+//################################################################
 void digitalClockDisplay(){
   // digital clock display of the time
   Serial.print("Start Time: ");
@@ -175,7 +165,7 @@ void digitalClockDisplay(){
   printDigits(second(acc_time));
   Serial.println();
 
- Serial.print("Time Left ");
+  Serial.print("Time Left ");
   if (synced == true) {
     time_left = (cook_timer - millis()) / 60000.0;
   }
@@ -189,11 +179,6 @@ void digitalClockDisplay(){
   printDigits(minute());
   printDigits(second());
   Serial.print(" ");
- // Serial.print(day());
-//  Serial.print(" ");
-//  Serial.print(month());
-//  Serial.print(" ");
-//  Serial.print(year()); 
   Serial.println(); 
   Serial.println(); 
 }
