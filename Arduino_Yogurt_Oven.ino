@@ -5,7 +5,7 @@
 #define TIME_REQUEST  7    // ASCII bell character requests a time sync message 
 
 // Data wire is plugged into pin 7 on the Arduino
-#define ONE_WIRE_BUS 7
+#define ONE_WIRE_BUS 4
 // Setup a oneWire instance to communicate with any OneWire devices
 OneWire oneWire(ONE_WIRE_BUS);
 // Pass our oneWire reference to Dallas Temperature. 
@@ -36,7 +36,7 @@ void setup()
                        //to view the result open the serial monitor 
   Serial.print("Program = yogurt_one_wire");
   Serial.println();
-  pinMode(8, OUTPUT);
+  pinMode(5, OUTPUT);
   Serial.println("Waiting for sync message");
   Serial.println("Enter length of ferment time first.  ex. \'S4.5\' for four and and a half hours");
   Serial.println("Subsequently, set the clock by using \'Date +T%s\' ");
@@ -69,14 +69,16 @@ void loop() {
      Serial.print("Temp is ");
      Serial.println(tmp);
      if (tmp < 114.60)  {
-        digitalWrite(8, 1);
+        digitalWrite(5, 1);
+        Serial.println("Heat ON");
      }
      if (tmp >= 115.00) {
-        digitalWrite(8, 0);
+        digitalWrite(5, 0);
+        Serial.println("Heat OFF");
      }
     if (time_left < 1 ) {
       Serial.println("Cook Complete, Yogurt Ready!");
-      digitalWrite(8, 0);
+      digitalWrite(5, 0);
       heat_off = true;
       timer_set = false;
       acc_time = 0;
